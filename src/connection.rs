@@ -59,11 +59,11 @@ impl Connection {
                             match Connection::handle(
                                 &mut handshake,
                                 &json,
-                                &mut stream,
                                 &table,
                                 &to_client,
                                 &to_server,
                                 &name,
+                                &id,
                                 &mut send,
                             ) {
                                 Ok(_) => {}
@@ -116,11 +116,11 @@ impl Connection {
     fn handle(
         handshake: &mut bool,
         json: &Value,
-        stream: &mut TcpStream,
         server_table: &Arc<Mutex<HashMap<String, Data>>>,
         to_client: &Arc<Mutex<Vec<Value>>>,
         to_server: &Arc<Mutex<Vec<Value>>>,
         name: &Arc<Mutex<String>>,
+        id: &usize,
         send: &mut dyn FnMut(&Value, &Arc<Mutex<Vec<Value>>>),
     ) -> Result<(), Error> {
         // println!("handle");
@@ -135,14 +135,26 @@ impl Connection {
             return Err(Error::new(ErrorKind::Other, "No response type"));
         }
         
-        // println!("Handling: {}", response_type);
-        
         match response_type {
             "handshake" => {
                 if !*handshake {
                     *handshake = true;
                     
                     let json_name = json.get("name").unwrap().as_str().unwrap();
+                    
+                    // if json_name includes any non-alphanumeric characters, return an error
+                    if !json_name.chars().all(|c| c.is_alphanumeric()) {
+                        // send a response
+                        let response = json!({
+                            "type": "handshake",
+                            "status": "error",
+                            "message": "Invalid client name"
+                        });
+                        
+                        send(&response, to_client);
+                        return Err(Error::new(ErrorKind::Other, "Invalid name"));
+                    }
+                    
                     let mut name = name.lock().unwrap();
                     *name = json_name.to_string();
                     
@@ -155,6 +167,7 @@ impl Connection {
                     let response = json!({
                         "type": "handshake",
                         "status": "ok",
+                        "id": id,
                         "table": table
                     });
                     
@@ -166,11 +179,9 @@ impl Connection {
                 Err(Error::new(ErrorKind::Other, "Handshake already completed"))
             }
             "update" => {
-                // update the table
                 // get the table from the JSON object
                 match json.get("table") {
                     Some(table) => {
-                        // println!("Updating table: {}", table);
                         // iterate over the table
                         let table = table.as_object().unwrap();
                         for (key, value) in table.iter() {
@@ -186,9 +197,7 @@ impl Connection {
                         
                         Ok(())
                     }
-                    None => {
-                        return Err(Error::new(ErrorKind::Other, "No table in JSON object"));
-                    }
+                    None => Err(Error::new(ErrorKind::Other, "No table in JSON object"))
                 }
             }
             _ => {
@@ -203,12 +212,9 @@ impl Connection {
         let mut buffer = [0; 2048];
         match stream.read(&mut buffer) {
             Ok(bytes_read) => {
-                // println!("Received {} bytes", bytes_read);
                 let json_string = String::from_utf8_lossy(&buffer[..bytes_read]);
-                // println!("raw: {}", json_string);
                 match serde_json::from_str(&json_string) {
                     Ok(json) => {
-                        // println!("{}", to_string_pretty(&json).unwrap());
                         Ok(Some(json))
                     }
                     Err(e) => {
