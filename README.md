@@ -51,7 +51,3 @@ You can either download the pre-built binaries or build the server from source.
 1. **Start the Server:**
     - Run the server executable.
     - By default, the server will start on `localhost:8080`.
-
-2. **Access the Dashboard:**
-    - Open a web browser and navigate to `http://localhost:8080`.
-    - You should see the dashboard with a list of connected clients.
