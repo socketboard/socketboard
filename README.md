@@ -1,4 +1,4 @@
-# Real-Time Variable Monitor and Control System
+# Socketboard Server
 
 A Rust-based server application designed for debugging and managing remote projects by allowing clients to view and edit variables in real-time. This system supports multiple clients with customizable permissions, making it ideal for development and monitoring purposes.
 
@@ -10,15 +10,12 @@ A Rust-based server application designed for debugging and managing remote proje
   View, modify, and monitor variables from a central dashboard.
   
 - **Multi-language Client Support:** 
-  Interfaces available for Python, JavaScript, Java, and Rust.
+  Interfaces available (soon) for Python, Rust, JavaScript, and Java.
   
-- **Permissions System:** 
+- **Permissions System (coming soon):** 
   Define client permissions for read-only, read/write, and restricted variable access.
-  
-- **Admin Tools:** 
-  Allow specific clients to manage other clients and view active connections.
-  
-- **Web Dashboard:** 
+
+- **Web Dashboard (coming soon):** 
   A simple and customizable UI for monitoring and editing variables.
 
 ---
@@ -46,6 +43,8 @@ You can either download the pre-built binaries or build the server from source.
     - Navigate to the project directory: `cd socketboard`
     - Build the server: `cargo build --release`
     - Run the server: `./target/release/socketboard`
+
+---
 
 ### Usage
 
