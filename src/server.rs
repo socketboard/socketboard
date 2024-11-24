@@ -7,6 +7,7 @@
 
 use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr, TcpListener};
+use std::process::exit;
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use serde_json::Value;
@@ -50,8 +51,20 @@ impl Server {
     }
 
     pub fn start(&self) {
-        println!("Server started on {}", self.address);
-        let listener = TcpListener::bind(self.address).unwrap();
+        let listener = 
+            match TcpListener::bind(self.address) {
+                Ok(listener) => {
+                    println!("Server started on {}", self.address);
+                    listener
+                },
+                Err(e) => {
+                    println!("Failed to bind: {}", e);
+                    println!("Press enter to exit...");
+                    let mut input = String::new();
+                    std::io::stdin().read_line(&mut input).unwrap();
+                    exit(0);
+                }
+            };
         let connections = self.connections.clone();
         let table = self.table.clone();
         
