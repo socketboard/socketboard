@@ -44,10 +44,26 @@ You can either download the pre-built binaries or build the server from source.
     - Build the server: `cargo build --release`
     - Run the server: `./target/release/socketboard`
 
----
-
 ### Usage
 
 1. **Start the Server:**
     - Run the server executable.
     - By default, the server will start on `localhost:8080`.
+
+---
+
+## Roadmap
+ - [X] Implement basic server functionality.
+#### High Priority
+ - [ ] Executable arguments for customization.
+ - [ ] Configuration file support.
+ - [ ] Complete Rust and Python SDKs.
+ - [ ] Server password/authentication support.
+ - [ ] Basic dashboard for variable monitoring.
+ - [ ] Add persistent storage for variables.
+
+#### Low Priority
+ - [ ] Expand support for additional programming languages.
+   - [ ] Java and JavaScript SDKs.
+ - [ ] Improve dashboard with advanced visualization tools.
+ - [ ] Add secure WebSocket connections (TLS/SSL).
