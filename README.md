@@ -55,10 +55,10 @@ You can either download the pre-built binaries or build the server from source.
 ## Roadmap
  - [X] Implement basic server functionality.
 #### High Priority
- - [ ] Executable arguments for customization.
- - [ ] Configuration file support.
  - [ ] Complete Rust and Python SDKs.
+ - [ ] Executable arguments for customization.
  - [ ] Server password/authentication support.
+ - [ ] Configuration file support.
  - [ ] Basic dashboard for variable monitoring.
  - [ ] Add persistent storage for variables.
 
