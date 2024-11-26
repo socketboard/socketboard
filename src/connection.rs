@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::io::{Error, ErrorKind, Read, Write};
-use std::net::TcpStream;
+use std::net::{Shutdown, TcpStream};
 use std::sync::{Arc, Mutex};
 use serde_json::{json, Value};
 use crate::utils::{Data, JSON};
@@ -75,8 +75,20 @@ impl Connection {
                         }
                         None => {}
                     }
+                    // connection aborted
+                    Err(ref e) if e.kind() == std::io::ErrorKind::ConnectionAborted => {
+                        stream.shutdown(Shutdown::Both).unwrap();
+                        println!("Connection aborted: ({}) {}", name.lock().unwrap().to_string(), id);
+                        break;
+                    }
                     Err(e) => {
-                        println!("Failed to read: {}", e);
+                        // send last messages
+                        let mut to_client = to_client.lock().unwrap();
+                        Connection::write(&mut stream, &mut to_client);
+                        
+                        stream.shutdown(Shutdown::Both).unwrap();
+                        
+                        println!("Failed to read: {}", e.to_string());
                         break;
                     }
                 }
@@ -148,11 +160,11 @@ impl Connection {
                         let response = json!({
                             "type": "handshake",
                             "status": "error",
-                            "message": "Invalid client name"
+                            "message": "Invalid client name",
+                            "terminate": true
                         });
                         
                         send(&response, to_client);
-                        return Err(Error::new(ErrorKind::Other, "Invalid name"));
                     }
                     
                     let mut name = name.lock().unwrap();
@@ -227,7 +239,7 @@ impl Connection {
                 Ok(None)
             }
             Err(_) => {
-                Err(std::io::Error::new(std::io::ErrorKind::Other, "Failed to read from stream"))
+                Err(std::io::Error::new(std::io::ErrorKind::ConnectionAborted, "Failed to read from stream"))
             }
         }
     }
@@ -239,6 +251,7 @@ impl Connection {
         while !message_buffer.is_empty() {
             let json_value = message_buffer.remove(0);
             let json_string = &json_value.to_string();
+            
             let bytes = json_string.as_bytes();
             
             // println!("Sending: {}", json_string);
