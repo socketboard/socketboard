@@ -15,7 +15,8 @@ fn main() {
     commands.add(commands::exit());
     commands.add(commands::clear());
     commands.add(commands::connections());
-    // commands.add(commands::display());
+    commands.add(commands::status());
+    commands.add(commands::table());
     commands.add(commands::terminate());
     
     server.start();

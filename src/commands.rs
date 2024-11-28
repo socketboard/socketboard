@@ -9,18 +9,19 @@ pub fn help() -> Command {
         "Display help information",
         Arc::new(|command: &ParsedCommand, commands: &CommandManager| {
             if command.args.len() == 0 {
-                println!("Call --help on a command to get specific help.\nCommands available:");
+                println!("Socketboard server commands:\n");
                 for (_, cmd) in &commands.commands {
                     // pad the name out to 20 characters
                     let mut names = cmd.name.to_string() + ", " + &cmd.aliases.join(", ");
                     if cmd.aliases.is_empty() {
                         names = names.trim_end_matches(", ").to_string();
                     }
-                    let padding = max(40 - names.len(), 3);
+                    let padding = max(23 - names.len(), 3);
                     let padding = " ".repeat(padding);
                     println!("{}{}{}", names, padding, cmd.description);
-                    
                 }
+                
+                println!("\nType 'help (command)' for more information on a command");
             } else {
                 let command_name = &command.args[0];
                 if let Some(command) = commands.commands.get(command_name) {
@@ -31,20 +32,46 @@ pub fn help() -> Command {
             }
         }),
         Arc::new(|| {
-            println!("help [command?] - Display help information");
+            println!("help (command) - Display help information");
         }),
     )
 }
 
-fn display() -> Command {
+pub fn status() -> Command {
     Command::new(
         "display",
         "Display the server information",
         Arc::new(|_: &ParsedCommand, server: &CommandManager| {
-            // a
+            println!("Address: {}", server.address);
+            println!("Connections: {}", server.connections.lock().unwrap().len());
+            println!("Table: {}", server.table.lock().unwrap().len());
         }),
         Arc::new(|| {
             println!("display - Display the server information");
+        }),
+    )
+}
+
+pub fn table() -> Command {
+    Command::with_aliases(
+        "table",
+        vec!["t"],
+        "Display the table",
+        Arc::new(|_: &ParsedCommand, server: &CommandManager| {
+            let table = server.table.lock().unwrap();
+            if table.len() == 0 {
+                println!("No data in the table");
+            } else {
+                println!("Table: ({})", table.len());
+            }
+            for (key, value) in &*table {
+                let padding = max(20 - key.len(), 3);
+                let padding = " ".repeat(padding);
+                println!("{}{}{}", key, padding, value);
+            }
+        }),
+        Arc::new(|| {
+            println!("table - Display the table");
         }),
     )
 }
