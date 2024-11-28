@@ -15,10 +15,9 @@ use crate::connection::Connection;
 use crate::utils::Data;
 
 pub struct Server {
-    address: SocketAddr,
+    pub address: SocketAddr,
     pub connections: Arc<Mutex<HashMap<usize, Connection>>>,
     pub table: Arc<Mutex<HashMap<String, Data>>>,
-    debug: bool,
 }
 
 impl Server {
@@ -30,7 +29,6 @@ impl Server {
             address,
             connections,
             table,
-            debug: false,
         }
     }
     
@@ -42,12 +40,7 @@ impl Server {
             address,
             connections,
             table,
-            debug: false,
         }
-    }
-    
-    pub fn debug_on(&mut self) {
-        self.debug = true;
     }
 
     pub fn start(&self) {
@@ -106,7 +99,7 @@ impl Server {
         let table = self.table.lock().unwrap();
         
         if clear {
-            crate::utils::clear_lines(table.len() as u16 + 100);
+            crate::utils::clear_lines(100);
         }
         println!("----- INFO ------");
         println!("Address: {}", self.address);

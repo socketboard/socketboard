@@ -98,3 +98,7 @@ impl JSON for Data {
 pub fn clear_lines(n: u16) {
     println!("\x1b[{}A\x1b[J", n);
 }
+
+pub fn clear_screen() {
+    print!("\x1B[2J\x1B[1;1H");
+}

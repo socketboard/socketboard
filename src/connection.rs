@@ -55,21 +55,23 @@ impl Connection {
                 // read from stream
                 match Connection::read(&mut stream) {
                     Ok(result) => match result {
-                        Some(json) => {
-                            match Connection::handle(
-                                &mut handshake,
-                                &json,
-                                &table,
-                                &to_client,
-                                &to_server,
-                                &name,
-                                &id,
-                                &mut send,
-                            ) {
-                                Ok(_) => {}
-                                Err(e) => {
-                                    println!("Failed to handle: {}", e);
-                                    break;
+                        Some(json_values) => {
+                            for json in json_values {
+                                match Connection::handle(
+                                    &mut handshake,
+                                    &json,
+                                    &table,
+                                    &to_client,
+                                    &to_server,
+                                    &name,
+                                    &id,
+                                    &mut send,
+                                ) {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        println!("Failed to handle: {}", e);
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -84,7 +86,7 @@ impl Connection {
                     Err(e) => {
                         // send last messages
                         let mut to_client = to_client.lock().unwrap();
-                        Connection::write(&mut stream, &mut to_client);
+                        let _ = Connection::write(&mut stream, &mut to_client);
                         
                         stream.shutdown(Shutdown::Both).unwrap();
                         
@@ -95,11 +97,17 @@ impl Connection {
                 
                 for connection in connections.lock().unwrap().values() {
                     let mut messages = connection.to_server.lock().unwrap();
-                    Connection::write(&mut stream, &mut messages);
+                    Connection::write(&mut stream, &mut messages).unwrap();
                 }
                 to_server.lock().unwrap().clear();
                 
-                Connection::write(&mut stream, &mut to_client.lock().unwrap());
+                match Connection::write(&mut stream, &mut to_client.lock().unwrap()) {
+                    Err(ref e) if e.kind() == ErrorKind::ConnectionAborted => {
+                        println!("Connection aborted: ({}) {}", name.lock().unwrap().to_string(), id);
+                        break;
+                    }
+                    _ => {}
+                }
             }
             
             let mut connections = connections.lock().unwrap();
@@ -116,13 +124,20 @@ impl Connection {
         if self.name.lock().unwrap().is_empty() {
             println!("Connection ({})", self.id);
         } else {
-            println!("{} ({})", self.id, self.name.lock().unwrap());
+            println!("{} (id: {})", self.name.lock().unwrap(), self.id);
         }
     }
 
     pub fn send(&mut self, json_value: &Value) {
         let mut buffer = self.to_client.lock().unwrap();
         buffer.push(json_value.clone());
+    }
+    
+    pub fn terminate(&mut self) {
+        let mut buffer = self.to_client.lock().unwrap();
+        buffer.push(json!({
+            "terminate": true
+        }));
     }
     
     fn handle(
@@ -220,26 +235,52 @@ impl Connection {
 
     fn read(
         stream: &mut TcpStream,
-    ) -> Result<Option<Value>, Error>{
+    ) -> Result<Option<Vec<Value>>, Error>{
         let mut buffer = [0; 2048];
         match stream.read(&mut buffer) {
             Ok(bytes_read) => {
                 let json_string = String::from_utf8_lossy(&buffer[..bytes_read]);
-                match serde_json::from_str(&json_string) {
-                    Ok(json) => {
-                        Ok(Some(json))
+                // sometimes the client sends too many messages at once and they're read like:
+                // { ... }{ ... }{ ... }
+                // split this into separate messages and return a vector of JSON objects
+                let json_strings: Vec<&str> = json_string.split("}{").collect();
+                
+                let mut json_values = Vec::new();
+                
+                for string in json_strings {
+                    let mut json_string = string.to_string();
+                    // if the string is empty, skip it
+                    if json_string.is_empty() {
+                        continue;
                     }
-                    Err(e) => {
-                        println!("Failed to parse JSON: {}", e);
-                        Ok(None)
+                    
+                    // if the string doesn't start with a {, add one
+                    if !json_string.starts_with("{") {
+                        json_string = format!("{}{}", "{".to_string(), json_string);
+                    }
+                    // if the string doesn't end with a }, add one
+                    if !json_string.ends_with("}") {
+                        json_string = format!("{}{}", json_string, "}".to_string());
+                    }
+                    
+                    match serde_json::from_str(&json_string) {
+                        Ok(json) => {
+                            json_values.push(json);
+                        }
+                        Err(e) => {
+                            println!("Failed to parse JSON: {}", e);
+                            println!("JSON: {}", json_string);
+                        }
                     }
                 }
+                
+                Ok(Some(json_values))
             }
-            Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+            Err(ref e) if e.kind() == ErrorKind::WouldBlock => {
                 Ok(None)
             }
             Err(_) => {
-                Err(std::io::Error::new(std::io::ErrorKind::ConnectionAborted, "Failed to read from stream"))
+                Err(Error::new(ErrorKind::ConnectionAborted, "Failed to read from stream"))
             }
         }
     }
@@ -247,24 +288,28 @@ impl Connection {
     fn write(
         stream: &mut TcpStream,
         message_buffer: &mut Vec<Value>,
-    ) {
+    ) -> Result<(), Error> {
         while !message_buffer.is_empty() {
             let json_value = message_buffer.remove(0);
             let json_string = &json_value.to_string();
             
             let bytes = json_string.as_bytes();
             
-            // println!("Sending: {}", json_string);
-
             match stream.write_all(bytes) {
-                Ok(_) => {
-                    // println!("Sent: {}", json_string);
-                }
+                Ok(_) => {}
                 Err(e) => {
-                    println!("Failed to send: {}", e);
-                    break;
+                    return Err(e);
                 }
             }
+            
+            // if there is a terminate: true, terminate the stream
+            if json_value.get("terminate") == Some(&Value::Bool(true)) {
+                println!("Terminating stream");
+                stream.shutdown(Shutdown::Both)?;
+                return Err(Error::new(ErrorKind::ConnectionAborted, "Terminating stream"));
+            }
         }
+        
+        Ok(())
     }
 }
