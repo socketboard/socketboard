@@ -97,6 +97,9 @@ impl CommandManager {
     }
     
     pub fn run(&self, string: String) {
+        if string.is_empty() {
+            return;
+        }
         let command = match parse_command(&string) {
             Ok(c) => c,
             Err(e) => {
